@@ -30,12 +30,13 @@ namespace Renderer
     inline uint32_t imageIndex = 0;
     inline int w = 1920;
     inline int h = 1080;
-    inline int prevW = 0;
-    inline int prevH = 0;
+    inline int x = INT_MAX;
+    inline int y = INT_MAX;
+    inline int prevW = 1920;
+    inline int prevH = 1080;
     inline int prevX = 0;
     inline int prevY = 0;
-    inline bool isFullScreen = false;
-
+    inline bool isMaximized = false;
     inline SurfaceHandle windowSurface;
     inline Queue generalQueue;
     inline Device rendererDevice;
@@ -54,6 +55,39 @@ namespace Renderer
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         window = glfwCreateWindow(w, h, "Profiler", nullptr, nullptr);
+        if (x != INT_MAX && y != INT_MAX)
+            glfwSetWindowPos(window, x, y);
+
+        if (isMaximized)
+        {
+            int x, y;
+            glfwGetWindowPos(window, &x, &y);
+            GLFWmonitor* closest = nullptr;
+            int count;
+            GLFWmonitor** monitors = glfwGetMonitors(&count);
+            int minDist = INT_MAX;
+            for (int i = 0; i < count; i++)
+            {
+                int xPos, yPos;
+                glfwGetMonitorPos(monitors[i], &xPos, &yPos);
+                int dist = INT_MAX;
+                if (x >= xPos)
+                    dist = x - xPos;
+
+                if (dist <= minDist)
+                {
+                    closest = monitors[i];
+                    minDist = dist;
+                }
+            }
+            const GLFWvidmode* mode = glfwGetVideoMode(closest);
+
+            glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
+            glfwSetWindowAttrib(window, GLFW_RESIZABLE, GLFW_FALSE);
+            glfwSetWindowSize(window, mode->width, mode->height);
+            glfwGetMonitorPos(closest, &x, &y);
+            glfwSetWindowPos(window, x, y);
+        }
         glfwSetFramebufferSizeCallback(window, [](GLFWwindow* window, int w, int h) {recreateFramebuffer = true; });
         int w, h; glfwGetFramebufferSize(window, &w, &h);
 
@@ -135,14 +169,15 @@ namespace Renderer
     {
         glfwPollEvents();
         if (glfwGetKey(window, GLFW_KEY_ESCAPE)) glfwSetWindowShouldClose(window, true);
+
         static bool released = true;
         if (glfwGetKey(window, GLFW_KEY_F11))
         {
             if (released)
             {
                 released = false;
-                isFullScreen = !isFullScreen;
-                if (isFullScreen)
+                isMaximized = !isMaximized;
+                if (isMaximized)
                 {
                     int x, y;
                     glfwGetWindowPos(window, &x, &y);
@@ -184,6 +219,8 @@ namespace Renderer
             }
         }
         else released = true;
+        glfwGetWindowPos(window, &x, &y);
+        glfwGetWindowSize(window, &w, &h);
 
         while (!inFlightFence[currentFrame].IsSignaled())
             std::this_thread::sleep_for(1ms);

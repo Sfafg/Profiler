@@ -113,6 +113,7 @@ static void ReadSettings()
     std::ifstream file("profilerSettings.txt");
     if (file.is_open())
     {
+        file >> Renderer::w >> Renderer::h >> Renderer::x >> Renderer::y >> Renderer::prevH >> Renderer::prevW >> Renderer::prevX >> Renderer::prevY >> Renderer::isMaximized;
         for (int i = 0; i < Profiler::maxFunctions; i++)
             settings[i].Read(file);
 
@@ -125,6 +126,7 @@ static void WriteSettings()
     std::ofstream file("profilerSettings.txt");
     if (file.is_open())
     {
+        file << Renderer::w << ' ' << Renderer::h << ' ' << Renderer::x << ' ' << Renderer::y << ' ' << Renderer::prevH << ' ' << Renderer::prevW << ' ' << Renderer::prevX << ' ' << Renderer::prevY << ' ' << Renderer::isMaximized << '\n';
         for (int i = 0; i < Profiler::GetFunctions().size(); i++)
             settings[i].Write(file);
 
@@ -194,8 +196,6 @@ std::tuple<float, const char*> TransfomWithSuffix(float value, Profiler::Functio
 
 void DrawFunction(Profiler::Function& function)
 {
-    PROFILE_NAMED_FUNCTION("Draw Function");
-
     ImGui::PushID(GetOffset(function));
 
     auto& refFunction = settings[GetOffset(function)].referances;
@@ -242,6 +242,10 @@ void DrawFunction(Profiler::Function& function)
         {
             refFunction.pop_back();
             settings[GetOffset(function)].referancePaths.pop_back();
+        }
+        else
+        {
+            Profiler::RemoveFunction(function.GetName());
         }
     }
     function.GetSamples().SetSampleLimit(settings[GetOffset(function)].limit);
@@ -360,7 +364,6 @@ void DrawFunction(Profiler::Function& function)
 
 int main()
 {
-    Renderer::Init();
     for (int i = 0; i < Profiler::maxFunctions; i++)
     {
         settings[i].width = 2.4;
@@ -368,39 +371,35 @@ int main()
         settings[i].limit = Profiler::maxSampleCount;
     }
     ReadSettings();
-
+    Renderer::Init();
+    SetPriorityClass(GetCurrentProcess(), IDLE_PRIORITY_CLASS);
     while (!glfwWindowShouldClose(Renderer::window))
     {
-        Profiler::BeginFrame();
+        Renderer::StartFrame();
+
+        ImGui::Begin("Profiler", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
+        ImGui::SetWindowSize(ImGui::GetIO().DisplaySize, ImGuiCond_Always);
+        ImGui::GetStyle().WindowRounding = 0.0f;
+        ImGui::SetWindowPos({ 0,0 });
+        ImGuiTableFlags tableFlags = ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable;
+        if (ImGui::BeginTable("Profiler", 4, tableFlags))
         {
-            PROFILE_NAMED_FUNCTION("Profiler Draw");
-            Renderer::StartFrame();
+            ImGui::TableSetupColumn("Function Name", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+            ImGui::TableSetupColumn("Stats", ImGuiTableColumnFlags_WidthFixed, 125.0f);
+            ImGui::TableSetupColumn("Total Stats", ImGuiTableColumnFlags_WidthFixed, 125.0f);
+            ImGui::TableSetupColumn("Samples");
+            ImGui::TableHeadersRow();
+            ImPlot::PushStyleVar(ImPlotStyleVar_PlotPadding, ImVec2(0, 0));
 
-            ImGui::Begin("Profiler", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
-            ImGui::SetWindowSize(ImGui::GetIO().DisplaySize, ImGuiCond_Always);
-            ImGui::GetStyle().WindowRounding = 0.0f;
-            ImGui::SetWindowPos({ 0,0 });
-            ImGuiTableFlags tableFlags = ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable;
-            if (ImGui::BeginTable("Profiler", 4, tableFlags))
-            {
-                ImGui::TableSetupColumn("Function Name", ImGuiTableColumnFlags_WidthFixed, 150.0f);
-                ImGui::TableSetupColumn("Stats", ImGuiTableColumnFlags_WidthFixed, 125.0f);
-                ImGui::TableSetupColumn("Total Stats", ImGuiTableColumnFlags_WidthFixed, 125.0f);
-                ImGui::TableSetupColumn("Samples");
-                ImGui::TableHeadersRow();
-                ImPlot::PushStyleVar(ImPlotStyleVar_PlotPadding, ImVec2(0, 0));
+            for (auto& i : Profiler::GetFunctions())
+                DrawFunction(i);
 
-                for (auto& i : Profiler::GetFunctions())
-                    DrawFunction(i);
-
-                ImPlot::PopStyleVar();
-                ImGui::EndTable();
-            }
-            ImGui::End();
-            Renderer::EndFrame();
+            ImPlot::PopStyleVar();
+            ImGui::EndTable();
         }
-        Profiler::EndFrame();
+        ImGui::End();
+        Renderer::EndFrame();
     }
-    Renderer::Quit();
     WriteSettings();
+    Renderer::Quit();
 }

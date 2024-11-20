@@ -3,7 +3,23 @@
 #include <windows.h>
 #include <assert.h>
 #include <cfloat>
+#include <filesystem>
 #include "Profiler.h"
+
+int GetID()
+{
+    char path[MAX_PATH];
+    GetModuleFileNameA(NULL, path, MAX_PATH);
+
+    int id = 0;
+    int mult = 1;
+    for (int i = 0; path[i] != 0; i++)
+    {
+        id += path[i] * mult;
+        mult *= 32;
+    }
+    return id;
+}
 
 Profiler::Samples::Samples() : totalSum(0.0f), totalMin(FLT_MAX), totalMax(-FLT_MAX), offset(0), totalSampleCount(0), sampleCount(0), sampleLimit(maxSampleCount), currentSample(0) {}
 
@@ -121,7 +137,7 @@ void Profiler::Samples::EndAccumulate()
 
 
 Profiler::Function::Function(const char* name, Profiler::FunctionType type)
-    :name{ 0 }, type(type), programID(GetCurrentProcessId())
+    :name{ 0 }, type(type), programID(GetID())
 {
     strncpy(this->name, name, maxFunctionNameLength);
 }
@@ -201,24 +217,22 @@ Profiler::ScopedFunction::~ScopedFunction()
 
 void Profiler::SetHightPriority()
 {
-    SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+    SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
 }
 
 void Profiler::BeginFrame()
 {
     isFrameActive = true;
-    int id = GetCurrentProcessId();
+    int id = GetID();
     for (auto&& i : GetFunctions())
         if (i.programID == id)
             i.GetSamples().BeginAccumulate();
 }
-
 void Profiler::EndFrame()
 {
     isFrameActive = false;
-    int id = GetCurrentProcessId();
     for (auto&& i : GetFunctions())
-        if (i.programID == id)
+        if (i.programID == GetID())
         {
             i.lastInvocations = i.invocations;
             i.invocations = 0;

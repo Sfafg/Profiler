@@ -8,8 +8,8 @@
 class Profiler
 {
 public:
-    static const unsigned int maxFunctions = 128;
-    static const unsigned int maxFunctionNameLength = 32;
+    static const unsigned int maxFunctions = 32;
+    static const unsigned int maxFunctionNameLength = 128;
     static const unsigned int maxSampleCount = 16384;
 
     class Function;
@@ -56,7 +56,7 @@ public:
 
     enum FunctionType
     {
-        Time, Memory
+        Time, Memory, Count
     };
 
     class Function
@@ -134,7 +134,7 @@ private:
 #define PROFILE_FUNCTION() Profiler::ScopedFunction MACRO_CONCAT(___SCOPED_FUNCTION_OBJECT___, __COUNTER__)(std::source_location::current().function_name())
 
 
-bool Profiler::InitHeader()
+inline bool Profiler::InitHeader()
 {
     if (headerHandle.header)
         return true;
